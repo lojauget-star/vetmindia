@@ -118,7 +118,18 @@ export function App() {
     }
   };
 
-  if (!isAuthenticated && !isLoading) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-vet-bg">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-clinical-blue border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-vet-secondary font-medium">Carregando ambiente Vetmind...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     if (authView === 'register') {
       return <RegisterPage onSwitchToLogin={() => setAuthView('login')} />;
     }
