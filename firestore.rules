@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isCreatingWithOwner() {
+      return isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /profiles/{profileId} {
+      allow read, write: if isOwner(profileId) || isDocOwner() || isCreatingWithOwner();
+    }
+
+    match /patients/{patientId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /cases/{caseId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /caseVersions/{versionId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /anamneses/{anamnesisId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /attachments/{attachmentId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /transcripts/{transcriptId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /analyses/{analysisId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /hypotheses/{hypothesisId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /evidence/{evidenceId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /literature/{literatureId} {
+      allow read: if isAuthenticated();
+      allow write: if isCreatingWithOwner() || isDocOwner();
+    }
+
+    match /literatureChunks/{chunkId} {
+      allow read: if isAuthenticated();
+      allow write: if isCreatingWithOwner() || isDocOwner();
+    }
+
+    match /prescriptions/{prescriptionId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /documents/{documentId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /timelineEvents/{eventId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /marketingProjects/{projectId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /brandKits/{brandKitId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /generatedAssets/{assetId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /jobs/{jobId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+
+    match /auditLogs/{logId} {
+      allow read, update, delete: if isDocOwner();
+      allow create: if isCreatingWithOwner();
+    }
+  }
+}

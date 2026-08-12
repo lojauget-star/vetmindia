@@ -1,0 +1,408 @@
+# VETMIND - DATA MODEL & SCHEMA SPECIFICATION
+
+**Version**: 1.0.0  
+**Status**: APPROVED  
+**Author**: Principal Software Engineer  
+
+---
+
+## 1. OVERVIEW
+
+Vetmind operates on Google Cloud Firestore with a strict UID-owned collection hierarchy centered around **`ClinicalCase`**. Every entity contains primary keys (`id`), timestamps (`createdAt`, `updatedAt`), owner references (`userId`), and version tracking where applicable.
+
+---
+
+## 2. COLLECTIONS CATALOG & SCHEMAS
+
+### 2.1 `users`
+Master user authentication record.
+- Path: `users/{userId}`
+```typescript
+interface UserDocument {
+  id: string; // matches Firebase Auth UID
+  email: string;
+  displayName: string;
+  role: 'VETERINARIAN' | 'CLINIC_ADMIN' | 'SPECIALIST';
+  activeProfileId: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string;
+}
+```
+
+### 2.2 `profiles`
+Veterinary practitioner profile & professional credentials.
+- Path: `profiles/{profileId}`
+```typescript
+interface ProfileDocument {
+  id: string;
+  userId: string; // Foreign Key to users
+  licenseNumber: string; // CRMV/License ID
+  clinicName: string;
+  specialties: string[];
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### 2.3 `patients`
+Animal patient metadata.
+- Path: `patients/{patientId}`
+```typescript
+interface PatientDocument {
+  id: string;
+  userId: string; // Owner UID
+  name: string;
+  species: 'CANINE' | 'FELINE' | 'EQUINE' | 'EXOTIC' | 'OTHER';
+  breed: string;
+  ageYears: number;
+  ageMonths: number;
+  gender: 'MALE_INTACT' | 'MALE_NEUTERED' | 'FEMALE_INTACT' | 'FEMALE_SPAYED';
+  weightKg: number;
+  tutorName: string;
+  tutorContact: string;
+  microchipId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### 2.4 `cases` (`ClinicalCase`) - CENTRAL ENTITY
+Root clinical case record orchestrating all diagnostic and therapeutic workflows.
+- Path: `cases/{caseId}`
+```typescript
+interface ClinicalCaseDocument {
+  id: string;
+  userId: string; // Owner UID
+  patientId: string; // Foreign Key to patients
+  caseNumber: string; // e.g. "CAS-2026-0811"
+  status: 'DRAFT' | 'ANAMNESIS_PENDING' | 'ANALYZING' | 'HYPOTHESES_GENERATED' | 'CONDUCT_SET' | 'CLOSED';
+  title: string;
+  chiefComplaint: string;
+  activeAnamnesisId?: string;
+  latestAnalysisId?: string;
+  currentVersion: number;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### 2.5 `caseVersions`
+Immutable version snapshots for audit compliance and clinical tracking.
+- Path: `caseVersions/{versionId}`
+```typescript
+interface CaseVersionDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  versionNumber: number;
+  snapshot: Record<string, any>; // Full serialized ClinicalCase state
+  changedBy: string;
+  changeReason: string;
+  createdAt: string;
+}
+```
+
+### 2.6 `anamneses`
+Clinical history, symptoms, onset, and physical examination metrics.
+- Path: `anamneses/{anamnesisId}`
+```typescript
+interface AnamnesisDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  patientId: string;
+  symptoms: string[];
+  onsetDate: string;
+  progression: 'ACUTE' | 'SUBACUTE' | 'CHRONIC' | 'EPISODIC';
+  dietHistory: string;
+  vaccinationStatus: string;
+  dewormingStatus: string;
+  physicalExam: {
+    temperatureC?: number;
+    heartRateBpm?: number;
+    respiratoryRateBpm?: number;
+    mucousMembranes?: string;
+    capillaryRefillTimeSec?: number;
+    hydrationStatus?: string;
+    bodyConditionScore?: number; // 1-9 scale
+    notes?: string;
+  };
+  rawNotes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### 2.7 `attachments`
+Uploaded exam files, images, radiographs, and laboratory PDFs.
+- Path: `attachments/{attachmentId}`
+```typescript
+interface AttachmentDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  fileName: string;
+  fileType: 'IMAGE' | 'PDF' | 'AUDIO' | 'OTHER';
+  mimeType: string;
+  storagePath: string; // Firebase Storage location
+  downloadUrl: string;
+  sizeBytes: number;
+  analyzedByAI: boolean;
+  createdAt: string;
+}
+```
+
+### 2.8 `transcripts`
+Audio transcriptions from consultation voice notes or client interviews.
+- Path: `transcripts/{transcriptId}`
+```typescript
+interface TranscriptDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  audioAttachmentId: string;
+  rawText: string;
+  structuredAnamnesisDraft?: Record<string, any>;
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  createdAt: string;
+}
+```
+
+### 2.9 `analyses`
+Gemini AI clinical reasoning outputs.
+- Path: `analyses/{analysisId}`
+```typescript
+interface AnalysisDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  anamnesisId: string;
+  geminiModelVersion: string;
+  clinicalSummary: string;
+  urgencyLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  suggestedDiagnosticSteps: string[];
+  rawPromptTokens: number;
+  rawResponseTokens: number;
+  createdAt: string;
+}
+```
+
+### 2.10 `hypotheses`
+Differential diagnostic hypotheses generated by the engine.
+- Path: `hypotheses/{hypothesisId}`
+```typescript
+interface HypothesisDocument {
+  id: string;
+  analysisId: string;
+  caseId: string;
+  userId: string;
+  diseaseName: string;
+  icdVetCode?: string;
+  probabilityScore: number; // 0.0 to 1.0
+  reasoning: string;
+  supportingFindings: string[];
+  contradictingFindings: string[];
+  recommendedExams: string[];
+  isSelected: boolean;
+  createdAt: string;
+}
+```
+
+### 2.11 `evidence`
+Literature RAG citation grounding linking hypotheses to indexed papers.
+- Path: `evidence/{evidenceId}`
+```typescript
+interface EvidenceDocument {
+  id: string;
+  hypothesisId: string;
+  caseId: string;
+  userId: string;
+  literatureChunkId: string;
+  paperTitle: string;
+  authors: string[];
+  publicationYear: number;
+  journal: string;
+  doi?: string;
+  snippet: string;
+  relevanceScore: number; // Vector cosine similarity
+  createdAt: string;
+}
+```
+
+### 2.12 `literature`
+Veterinary textbooks, peer-reviewed journals, and clinical guideline metadata.
+- Path: `literature/{literatureId}`
+```typescript
+interface LiteratureDocument {
+  id: string;
+  title: string;
+  authors: string[];
+  sourceName: string;
+  publicationYear: number;
+  category: 'CARDIOLOGY' | 'DERMATOLOGY' | 'ONCOLOGY' | 'INTERNAL_MEDICINE' | 'SURGERY' | 'OTHER';
+  isPeerReviewed: boolean;
+  totalChunks: number;
+  createdAt: string;
+}
+```
+
+### 2.13 `literatureChunks`
+Tokenized and embedded literature passages for RAG search.
+- Path: `literatureChunks/{chunkId}`
+```typescript
+interface LiteratureChunkDocument {
+  id: string;
+  literatureId: string;
+  chunkIndex: number;
+  text: string;
+  embedding: number[]; // Gemini text-embedding-004 768-dim vector
+  keywords: string[];
+  createdAt: string;
+}
+```
+
+### 2.14 `prescriptions`
+Veterinary drug prescriptions, dosages, and administration instructions.
+- Path: `prescriptions/{prescriptionId}`
+```typescript
+interface PrescriptionDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  patientId: string;
+  items: Array<{
+    medicationName: string;
+    activeIngredient: string;
+    dosageMgKg: number;
+    totalDosage: string;
+    route: 'ORAL' | 'SUBCUTANEOUS' | 'INTRAMUSCULAR' | 'INTRAVENOUS' | 'TOPICAL' | 'OTHER';
+    frequency: string; // e.g. "Every 12 hours"
+    durationDays: number;
+    instructions: string;
+  }>;
+  specialInstructions: string;
+  digitalSignatureUrl?: string;
+  createdAt: string;
+}
+```
+
+### 2.15 `documents`
+Generated clinical reports, discharge notes, and referral documents.
+- Path: `documents/{documentId}`
+```typescript
+interface DocumentRecord {
+  id: string;
+  caseId: string;
+  userId: string;
+  type: 'CLINICAL_REPORT' | 'PRESCRIPTION_PDF' | 'REFERRAL_LETTER' | 'TUTOR_GUIDE';
+  title: string;
+  storagePath: string;
+  downloadUrl: string;
+  generatedBy: string;
+  createdAt: string;
+}
+```
+
+### 2.16 `timelineEvents`
+Chronological audit log of all clinical events associated with a case.
+- Path: `timelineEvents/{eventId}`
+```typescript
+interface TimelineEventDocument {
+  id: string;
+  caseId: string;
+  userId: string;
+  eventType: 'CASE_CREATED' | 'ANAMNESIS_ADDED' | 'ATTACHMENT_UPLOADED' | 'AI_ANALYSIS_COMPLETED' | 'HYPOTHESIS_SELECTED' | 'PRESCRIPTION_GENERATED' | 'DOCUMENT_EXPORTED';
+  actorName: string;
+  description: string;
+  metadata: Record<string, any>;
+  timestamp: string;
+}
+```
+
+### 2.17 `marketingProjects`
+Educational content, case study posts, or clinic newsletter projects.
+- Path: `marketingProjects/{projectId}`
+```typescript
+interface MarketingProjectDocument {
+  id: string;
+  userId: string;
+  sourceCaseId?: string;
+  title: string;
+  targetAudience: 'PET_OWNERS' | 'VETERINARIANS' | 'GENERAL_PUBLIC';
+  status: 'DRAFT' | 'GENERATED' | 'PUBLISHED';
+  createdAt: string;
+}
+```
+
+### 2.18 `brandKits`
+Clinic branding guidelines, logos, and custom color presets for marketing.
+- Path: `brandKits/{brandKitId}`
+```typescript
+interface BrandKitDocument {
+  id: string;
+  userId: string;
+  clinicName: string;
+  logoStoragePath?: string;
+  primaryColorHex: string;
+  secondaryColorHex: string;
+  tagline?: string;
+  createdAt: string;
+}
+```
+
+### 2.19 `generatedAssets`
+Generated social media cards, infographics, and text posts derived from marketing projects.
+- Path: `generatedAssets/{assetId}`
+```typescript
+interface GeneratedAssetDocument {
+  id: string;
+  projectId: string;
+  userId: string;
+  assetType: 'INSTAGRAM_CAROUSEL' | 'BLOG_ARTICLE' | 'EDUCATIONAL_FLYER';
+  contentMarkdown: string;
+  imageStoragePaths: string[];
+  createdAt: string;
+}
+```
+
+### 2.20 `jobs`
+Asynchronous task execution queue (AI generation, PDF rendering, RAG indexing).
+- Path: `jobs/{jobId}`
+```typescript
+interface JobDocument {
+  id: string;
+  userId: string;
+  type: 'AI_ANALYSIS' | 'PDF_GENERATION' | 'RAG_EMBEDDING' | 'AUDIO_TRANSCRIPTION';
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  payload: Record<string, any>;
+  result?: Record<string, any>;
+  error?: string;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### 2.21 `auditLogs`
+Immutable security and HIPAA-equivalent data access logs.
+- Path: `auditLogs/{logId}`
+```typescript
+interface AuditLogDocument {
+  id: string;
+  userId: string;
+  action: 'READ' | 'WRITE' | 'DELETE' | 'EXPORT' | 'AI_INVOCATION';
+  resourceType: string;
+  resourceId: string;
+  ipAddress?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+```
