@@ -17,7 +17,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onSucc
   const [password, setPassword] = useState('');
   const [isResetOpen, setIsResetOpen] = useState(false);
 
-  const { login, loginWithGoogle, isLoading, error } = useAuthStore();
+  const { login, loginWithGoogle, isLoading, error, clearError } = useAuthStore();
+
+  React.useEffect(() => {
+    clearError();
+  }, [clearError]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

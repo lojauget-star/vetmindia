@@ -24,15 +24,27 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   error: null,
 
   initAuthListener: () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     const unsubscribe = authService.onAuthStateChangedListener(async (firebaseUser) => {
       if (firebaseUser) {
         try {
           const uid = firebaseUser.uid;
-          let user = await userRepository.getUserAccount(uid);
-          let profile = await userRepository.getProfile(uid);
-
           const now = new Date().toISOString();
+          let user: UserAccount | null = null;
+          let profile: UserProfile | null = null;
+
+          try {
+            user = await userRepository.getUserAccount(uid);
+          } catch (e) {
+            console.warn('[AuthStore] Could not fetch existing user doc:', e);
+          }
+
+          try {
+            profile = await userRepository.getProfile(uid);
+          } catch (e) {
+            console.warn('[AuthStore] Could not fetch existing profile doc:', e);
+          }
+
           if (!user) {
             user = {
               uid,
@@ -43,7 +55,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
               createdAt: now,
               updatedAt: now,
             };
-            await userRepository.createUserAccount(user);
+            try {
+              await userRepository.createUserAccount(user);
+            } catch (e) {
+              console.warn('[AuthStore] Firestore write user fallback:', e);
+            }
           }
 
           if (!profile) {
@@ -60,13 +76,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
               createdAt: now,
               updatedAt: now,
             };
-            await userRepository.saveProfile(profile);
+            try {
+              await userRepository.saveProfile(profile);
+            } catch (e) {
+              console.warn('[AuthStore] Firestore write profile fallback:', e);
+            }
           }
 
           set({ user, profile, isAuthenticated: true, isLoading: false, error: null });
         } catch (err: any) {
-          console.error('[AuthStore] Error loading user context:', err);
-          set({ user: null, profile: null, isAuthenticated: false, isLoading: false, error: err.message });
+          console.warn('[AuthStore] Auth context fallback:', err);
+          set({ user: null, profile: null, isAuthenticated: false, isLoading: false, error: null });
         }
       } else {
         set({ user: null, profile: null, isAuthenticated: false, isLoading: false, error: null });
