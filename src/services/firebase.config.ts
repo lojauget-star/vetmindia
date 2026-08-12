@@ -4,20 +4,21 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { initializeAppCheck, ReCaptchaV3Provider, CustomProvider } from 'firebase/app-check';
 
+const isTestEnv = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDemoKeyForVetmindLocalDev123',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'vetmind-app.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'vetmind-app',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'vetmind-app.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1029384756',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:1029384756:web:abcd1234efgh5678',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || (isTestEnv ? 'AIzaSyDemoKeyForVetmindLocalDev123' : 'AIzaSyCE2pk5V5ltd7MhsMDHWALXLXOYnn2WOjY'),
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (isTestEnv ? 'vetmind-app.firebaseapp.com' : 'vetmind-645ba.firebaseapp.com'),
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || (isTestEnv ? 'vetmind-app' : 'vetmind-645ba'),
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (isTestEnv ? 'vetmind-app.appspot.com' : 'vetmind-645ba.firebasestorage.app'),
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (isTestEnv ? '1029384756' : '103236974580'),
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || (isTestEnv ? '1:1029384756:web:abcd1234efgh5678' : '1:103236974580:web:6c8c957d8e6e4caeb66ba1'),
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check for Firebase Security Enforcement
 const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_KEY;
-const isTestEnv = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
 
 if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined' && !isTestEnv) {
   if (appCheckSiteKey) {
